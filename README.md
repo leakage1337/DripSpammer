@@ -10,3 +10,5 @@
 # How-to-use
 - pip install -r requirements.txt
 - py main.py
+# Contact
+> If you found a bug lnk: leakage#9999
