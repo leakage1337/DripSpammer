@@ -11,4 +11,4 @@
 - pip install -r requirements.txt
 - py main.py
 # Contact
-> If you found a bug lnk: leakage#9999
+> If you found a bug lmk: leakage#9999 / @leakage1337
