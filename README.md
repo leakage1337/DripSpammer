@@ -9,4 +9,4 @@
 - Friend bomber
 # How-to-use
 - pip install -r requirements.txt
-- start main.py
+- py main.py
