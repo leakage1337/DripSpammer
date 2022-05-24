@@ -7,6 +7,7 @@
 - Channel spammer
 - Token checker
 - Friend bomber
+- DM Spammer
 # How-to-use
 - pip install -r requirements.txt
 - py main.py
