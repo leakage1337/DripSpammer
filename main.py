@@ -13,6 +13,7 @@ tokens = []
 proxies = []
 
 spammed = 0
+spammed_failed = 0
 
 joined = 0
 joined_captcha = 0
@@ -80,6 +81,73 @@ class ChannelSpammer():
             self.spam_channel()
             #time.sleep(0.05)
 
+class DMSpammer():
+    def __init__(self, token, id, message):
+        self.token = token
+        self.id = id
+        self.message = message
+
+    def spam_dm(self):
+        if ":" in self.token:
+            self.token = self.token.split(":")[2]
+        headers = { 
+            "Host": "discord.com",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:100.0) Gecko/20100101 Firefox/100.0",
+            "Accept": "*/*",
+            "Accept-Language": "de,en-US;q=0.7,en;q=0.3",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Content-Type": "application/json",
+            "X-Context-Properties": "eyJsb2NhdGlvbiI6IkpvaW4gR3VpbGQiLCJsb2NhdGlvbl9ndWlsZF9pZCI6IjczNTIzMDEyMjY5NjYzODU0NSIsImxvY2F0aW9uX2NoYW5uZWxfaWQiOiI5NzU3MDIyNjY1NTAwNTQ5NjIiLCJsb2NhdGlvbl9jaGFubmVsX3R5cGUiOjB9",
+            "Authorization": self.token,
+            "X-Super-Properties": "eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiRmlyZWZveCIsImRldmljZSI6IiIsInN5c3RlbV9sb2NhbGUiOiJkZSIsImJyb3dzZXJfdXNlcl9hZ2VudCI6Ik1vemlsbGEvNS4wIChXaW5kb3dzIE5UIDEwLjA7IFdpbjY0OyB4NjQ7IHJ2OjEwMC4wKSBHZWNrby8yMDEwMDEwMSBGaXJlZm94LzEwMC4wIiwiYnJvd3Nlcl92ZXJzaW9uIjoiMTAwLjAiLCJvc192ZXJzaW9uIjoiMTAiLCJyZWZlcnJlciI6IiIsInJlZmVycmluZ19kb21haW4iOiIiLCJyZWZlcnJlcl9jdXJyZW50IjoiIiwicmVmZXJyaW5nX2RvbWFpbl9jdXJyZW50IjoiIiwicmVsZWFzZV9jaGFubmVsIjoic3RhYmxlIiwiY2xpZW50X2J1aWxkX251bWJlciI6MTI5MjY4LCJjbGllbnRfZXZlbnRfc291cmNlIjpudWxsfQ==",
+            "X-Discord-Locale": "en-US",
+            "X-Debug-Options": "bugReporterEnabled",
+            "Origin": "https://discord.com",
+            "DNT": "1",
+            #"Sec-Gpc": "1",
+            "Connection": "keep-alive",
+            "Referer": f"https://discord.com/api/v9/channels/{self.id}/messages",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "TE": "trailers"
+        }
+        global spammed
+        global spammed_failed
+        with httpx.Client(headers=headers, proxies="http://" + random.choice(proxies)) as client:
+            cookes_raw = str(client.get('https://discord.com/api/v9/users/@me').headers['set-cookie'])
+            dcfduid = cookes_raw.split("__dcfduid=")[1].split("Expires=")[0]
+            sdcfduid = cookes_raw.split("__sdcfduid=")[1].split("Expires=")[0]
+            cookies = f"__dcfduid={dcfduid}__sdcfduid={sdcfduid} locale:en-US;"
+            client.headers["Cookie"] = cookies
+            create_channel = client.post("https://discord.com/api/v9/users/@me/channels", json={"recipients":[f"{str(self.id)}"]})
+            try:
+                new_id = create_channel.json()["id"]
+            except:
+                spammed_failed += 1
+                set_title(f"Spammed dms: {str(spammed)} Failed dms: {str(spammed_failed)}")
+                s_print(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} {Fore.LIGHTRED_EX}Failed spam with {self.token}: {create_channel.text}{Style.RESET_ALL}")
+                return
+            response = client.post(f"https://discord.com/api/v9/channels/{new_id}/messages", json={"content": str(self.message)})
+            if(response.status_code == 200):
+                spammed += 1
+                s_print(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} {Fore.LIGHTGREEN_EX}Spammed: {self.id} with {self.token}{Style.RESET_ALL}")
+            else:
+                spammed_failed += 1
+                if(response.json()["code"] == 20028):
+                    tosleep = response.json()["retry_after"]
+                    s_print(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} {Fore.YELLOW}Sleep {tosleep} with {self.token}{Style.RESET_ALL}")
+                    time.sleep(tosleep)
+                else:
+                    s_print(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} {Fore.LIGHTRED_EX}Failed spam with {self.token}: {response.text}{Style.RESET_ALL}")
+            set_title(f"Spammed dms: {str(spammed)} Failed dms: {str(spammed_failed)}")
+
+    def spam_dm_loop(self):
+        while True:
+            self.spam_dm()
+            #time.sleep(0.05)
+
+
 class Joiner():
     def __init__(self, token, invite, verify):
         self.token = token
@@ -127,6 +195,7 @@ class Joiner():
                     verify_json = client.get(f"https://discord.com/api/v9/guilds/{guild_id}/member-verification?with_guild=false&invite_code={self.invite}")
                     verify_resp = client.put(f"https://discord.com/api/v9/guilds/{guild_id}/requests/@me", json=verify_json.json())
                     if verify_resp.status_code == 201:
+                        joined += 1
                         s_print(f"{Fore.GREEN}Joined & Bypassed: {self.token} to {name}{Style.RESET_ALL}")
                 else:
                     joined += 1
@@ -298,6 +367,17 @@ def channelspammer_module():
         threading.Thread(target=instant.spam_channel_loop).start()
         #time.sleep(0.01)
 
+def dmspammer_module():
+    os.system("cls")
+    s_print(Fore.LIGHTMAGENTA_EX + intro + Style.RESET_ALL)
+    s_print(" ")
+    id = int(input(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} Enter user id: "))
+    message = input(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} Enter message to spam: ")
+    for token in tokens:
+        instant = DMSpammer(token, id, message)
+        threading.Thread(target=instant.spam_dm_loop).start()
+        #time.sleep(0.01)
+
 def checker_module():
     os.system("cls")
     s_print(Fore.LIGHTMAGENTA_EX + intro + Style.RESET_ALL)
@@ -394,6 +474,7 @@ def main():
     s_print(f"{Fore.LIGHTMAGENTA_EX}[2]{Style.RESET_ALL} Channel spammer")
     s_print(f"{Fore.LIGHTMAGENTA_EX}[3]{Style.RESET_ALL} Checker")
     s_print(f"{Fore.LIGHTMAGENTA_EX}[4]{Style.RESET_ALL} Friend bomber")
+    s_print(f"{Fore.LIGHTMAGENTA_EX}[5]{Style.RESET_ALL} DMSpammer")
     s_print(" ")
     option = input(f"{Fore.LIGHTMAGENTA_EX}[>]{Style.RESET_ALL} Enter choice: ")
     try:
@@ -410,6 +491,8 @@ def main():
         checker_module()
     elif(option == 4):
         friendbomber_module()
+    elif(option == 5):
+        dmspammer_module()
     else:
         print(f"{Fore.LIGHTMAGENTA_EX}[!]{Style.RESET_ALL} Choice must be integer bewteen 1-4")
         time.sleep(2)
